@@ -1,0 +1,8 @@
+/* Main CSS file - imports all other CSS files */
+@import './reset.css';
+@import './scrollbar.css';
+@import './glass.css';
+@import './animations.css';
+@import './responsive.css';
+@import './weather.css';
+@import './theme.css'; /* Import theme.css */

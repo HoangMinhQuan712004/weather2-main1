@@ -1,0 +1,24 @@
+/* Weather condition backgrounds */
+.weather-clear {
+  background: linear-gradient(135deg, #87CEEB 0%, #98D8E8 100%);
+}
+
+.weather-clouds {
+  background: linear-gradient(135deg, #B0C4DE 0%, #D3D3D3 100%);
+}
+
+.weather-rain {
+  background: linear-gradient(135deg, #4682B4 0%, #5F9EA0 100%);
+}
+
+.weather-snow {
+  background: linear-gradient(135deg, #E6E6FA 0%, #F0F8FF 100%);
+}
+
+.weather-thunderstorm {
+  background: linear-gradient(135deg, #2F4F4F 0%, #708090 100%);
+}
+
+.weather-mist {
+  background: linear-gradient(135deg, #C0C0C0 0%, #DCDCDC 100%);
+}
