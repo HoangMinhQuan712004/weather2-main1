@@ -9,22 +9,15 @@ const getForecastData = async (lat, lon, units = 'metric') => {
 };
 
 const getHistoricalData = async (lat, lon, dt) => {
-  // dt should be a Unix timestamp (in seconds)
-  // This is a placeholder. A real implementation would use a specific historical API endpoint.
-  // For example, OpenWeatherMap One Call API 3.0 historical data or similar.
-  console.log(`Fetching historical data for lat: ${lat}, lon: ${lon}, dt: ${dt}`);
-  try {
-    const response = await weatherApi.get('https://api.openweathermap.org/data/2.5/onecall/timemachine', { 
-      lat, 
-      lon, 
-      dt, 
-      units: 'metric' // Assuming metric units for historical data
-    });
-    return response;
-  } catch (error) {
-    console.error('Error fetching historical data:', error);
-    throw error;
-  }
+  // Historical endpoint is disabled:
+  // The previous implementation called OpenWeather 'onecall/timemachine' which
+  // requires a paid/appropriate key and produced repeated 401 errors in our logs.
+  // To avoid noisy failures, this function now throws a clear error. If you
+  // want historical data again, replace this implementation with a supported
+  // provider or enable the appropriate OpenWeather product and update the
+  // configuration accordingly.
+  console.warn('getHistoricalData was called but historical support is disabled.');
+  throw new Error('Historical weather support is disabled on this server. Enable a provider or remove calls to this endpoint.');
 };
 
 const searchCities = async (query) => {
@@ -39,21 +32,29 @@ const searchCities = async (query) => {
     return [];
   }
 
+  // Use OpenWeather Geocoding API for reliable city search
+  // https://openweathermap.org/api/geocoding-api
   try {
-    // Use OpenWeather Geocoding API for reliable city search
-    // https://openweathermap.org/api/geocoding-api
     const results = await weatherApi.get('http://api.openweathermap.org/geo/1.0/direct', { 
       q: trimmedQuery, 
       limit: 10 
     });
-    
+
     // The geocoding endpoint returns an array of locations
     console.log(`Search for "${trimmedQuery}" returned ${Array.isArray(results) ? results.length : 0} results`);
     return results || [];
   } catch (error) {
     console.error('Search cities error:', error);
-    // Return empty array instead of throwing to prevent app crashes
-    return [];
+    // If the upstream returned a 401 / invalid API key, surface a clear error
+    const status = error.response?.status;
+    const respData = error.response?.data;
+    if (status === 401 || (respData && (respData.cod === 401 || /invalid api key/i.test(respData.message || '')))) {
+      const err = new Error('Invalid API key. Please see https://openweathermap.org/faq#error401 for more info.');
+      err.code = 'API_KEY_INVALID';
+      throw err;
+    }
+    // For other errors, rethrow so route can decide how to handle it
+    throw error;
   }
 };
 

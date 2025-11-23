@@ -241,10 +241,11 @@ const LoadingSpinner = styled.div`
 const SearchModal = ({ onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchHistory, setSearchHistory] = useState([]);
+  const [searchError, setSearchError] = useState(null);
   const inputRef = useRef(null);
   
-  // Debounce search query to avoid excessive API calls
-  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  // Debounce search query to avoid excessive API calls (800ms to prevent rapid requests)
+  const debouncedSearchQuery = useDebounce(searchQuery, 800);
   
   const { 
     searchResults, 
@@ -253,6 +254,7 @@ const SearchModal = ({ onClose }) => {
     searchCities, 
     getCurrentWeather,
     getForecast,
+    getWeatherBundle,
     addToSearchHistory,
     getSearchHistory,
     clearSearchHistory,
@@ -286,15 +288,24 @@ const SearchModal = ({ onClose }) => {
   const handleSearch = useCallback(async (query) => {
     if (query.trim().length < 2) {
       console.log('Query too short, clearing results');
+      setSearchError(null);
       return;
     }
     
     console.log('handleSearch called with:', query);
     try {
+      setSearchError(null);
       const results = await searchCities(query);
       console.log('Search completed with results:', results);
     } catch (error) {
       console.error('Search failed:', error);
+      // Normalize error message for display
+      const apiError = error?.response?.data?.error || error?.response?.data?.message || error?.message;
+      if (apiError === 'API_KEY_MISSING' || /Invalid API key/i.test(apiError || '')) {
+        setSearchError('Weather service API key is invalid or not configured. Contact the administrator.');
+      } else {
+        setSearchError('Search failed. Please try again.');
+      }
     }
   }, [searchCities]);
 
@@ -305,6 +316,7 @@ const SearchModal = ({ onClose }) => {
     } else if (debouncedSearchQuery.trim().length === 0) {
       // Clear results when search is empty
       clearSearchResults();
+      setSearchError(null);
     }
   }, [debouncedSearchQuery, handleSearch, clearSearchResults]);
 
@@ -315,9 +327,16 @@ const SearchModal = ({ onClose }) => {
 
   const handleCitySelect = async (city) => {
     try {
-      // Get weather for selected city
-      await getCurrentWeather(city.lat, city.lon);
-      await getForecast(city.lat, city.lon);
+      // Get weather for selected city. Use bundled fetch if available to
+      // reduce duplicate requests; otherwise fetch both in parallel.
+      if (typeof getWeatherBundle === 'function') {
+        await getWeatherBundle(city.lat, city.lon);
+      } else {
+        await Promise.all([
+          getCurrentWeather(city.lat, city.lon),
+          getForecast(city.lat, city.lon)
+        ]);
+      }
       
       // Add to search history
       await addToSearchHistory(city.name, city.country);
@@ -416,10 +435,16 @@ const SearchModal = ({ onClose }) => {
               )}
 
               {!searchLoading && searchResults.length === 0 && searchQuery.length >= 2 && (
-                <EmptyState>
-                  <p>No cities found for "{searchQuery}"</p>
-                  <p>Try a different search term</p>
-                </EmptyState>
+                searchError ? (
+                  <EmptyState>
+                    <p>{searchError}</p>
+                  </EmptyState>
+                ) : (
+                  <EmptyState>
+                    <p>No cities found for "{searchQuery}"</p>
+                    <p>Try a different search term</p>
+                  </EmptyState>
+                )
               )}
 
               {!searchLoading && searchQuery.length < 2 && searchHistory.length > 0 && (

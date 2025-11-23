@@ -3,12 +3,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWeather } from '../contexts/WeatherContext';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import WeatherDisplay from '../components/WeatherDisplay';
+import SuggestionCard from '../components/SuggestionCard';
+import { getSuggestions } from '../utils/suggestions';
 import SearchModal from '../components/SearchModal';
 import FavoritesModal from '../components/FavoritesModal';
 import DiscordSettings from '../components/DiscordSettings';
-import WeatherTrendChart from '../components/WeatherTrendChart';
 import WeatherMap from '../components/WeatherMap';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -26,15 +28,11 @@ const weatherGradients = {
 
 const HomeContainer = styled.div`
   min-height: 100vh;
-  background: ${props => {
-    const weatherType = props.weather?.current?.weather?.main?.toLowerCase();
-    const gradient = weatherGradients[weatherType] || weatherGradients.default;
-    return gradient; // Keep weather-specific gradients
-  }};
-  transition: background 0.5s ease;
+  background: var(--background-color);
+  transition: background 0.5s ease, color 0.5s ease;
   position: relative;
   overflow: hidden;
-  color: var(--text-color-light); /* Apply text color from theme */
+  color: var(--text-color);
 `;
 
 const SnowEffect = styled.div`
@@ -79,7 +77,6 @@ const MainContent = styled.div`
   position: relative;
   z-index: 2;
   display: flex;
-  /* account for fixed header (~80px) so panels have stable height */
   min-height: calc(100vh - 80px);
   height: calc(100vh - 80px);
 
@@ -95,9 +92,14 @@ const LeftPanel = styled(motion.div)`
   padding: 40px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  color: var(--text-color-light); /* Apply text color from theme */
+  color: var(--text-color);
+
+  & > div {
+    width: 100%;
+    max-width: 920px;
+  }
   
   @media (max-width: 768px) {
     padding: 20px;
@@ -107,19 +109,18 @@ const LeftPanel = styled(motion.div)`
 
 const RightPanel = styled(motion.div)`
   flex: 1;
-  background: var(--card-background-light);
-  backdrop-filter: blur(10px);
-  border-left: 1px solid var(--border-color-light);
+  background: var(--card-background);
+  backdrop-filter: blur(8px);
+  border-left: 1px solid var(--border-color);
   padding: 40px;
   overflow-y: auto;
-  /* keep panel height tied to MainContent to avoid reflow */
   position: relative;
   height: 100%;
   box-sizing: border-box;
 
   @media (max-width: 768px) {
     border-left: none;
-    border-top: 1px solid var(--border-color-light);
+    border-top: 1px solid var(--border-color);
     padding: 20px;
     position: relative;
     height: auto;
@@ -135,22 +136,22 @@ const WelcomeMessage = styled.div`
     font-weight: bold;
     margin-bottom: 10px;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-    color: var(--text-color-light); /* Apply text color from theme */
+    color: var(--text-color);
   }
   
   p {
     font-size: 1.2rem;
     opacity: 0.9;
-    color: var(--text-color-light); /* Apply text color from theme */
+    color: var(--text-color);
   }
 `;
 
 const GetStartedButton = styled.button`
-  background: var(--header-background-light);
-  border: 2px solid var(--border-color-light);
+  background: var(--header-background);
+  border: 2px solid var(--border-color);
   border-radius: 15px;
   padding: 15px 30px;
-  color: var(--text-color-light);
+  color: var(--text-color);
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
@@ -176,36 +177,53 @@ const Home = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showDiscordSettings, setShowDiscordSettings] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
     // Try to get weather for user's last location or current location
     const loadInitialWeather = async () => {
       try {
-        // Only load if we don't already have weather data
         if (!currentWeather) {
-          if (user?.lastLocation) {
-            // Use geolocation endpoint for better performance (single API call)
-            await getGeolocationWeather();
-          } else {
-            await getGeolocationWeather();
-          }
+          // Load ban đầu KHÔNG force refresh (dùng cache nếu có)
+          await getGeolocationWeather(false);
         }
       } catch (error) {
         console.error('Failed to load initial weather:', error);
       }
     };
 
-    // Add a small delay to prevent race conditions
     const timeoutId = setTimeout(loadInitialWeather, 100);
     return () => clearTimeout(timeoutId);
-  }, [user, currentWeather, getGeolocationWeather]);
+  }, [currentWeather]);
+
+  // Tính toán suggestions khi có dữ liệu thời tiết
+  useEffect(() => {
+    if (currentWeather) {
+      console.log('=== DEBUG SUGGESTIONS ===');
+      console.log('Current Weather:', currentWeather);
+      console.log('Forecast:', forecast);
+      
+      const newSuggestions = getSuggestions({ 
+        current: currentWeather.current || currentWeather, 
+        forecast: forecast || currentWeather?.forecast 
+      });
+      
+      console.log('Suggestions được tạo:', newSuggestions);
+      console.log('========================');
+      
+      setSuggestions(newSuggestions);
+    }
+  }, [currentWeather, forecast]);
 
   const handleGetCurrentLocation = async () => {
     try {
-      const result = await getGeolocationWeather();
+      // FORCE REFRESH = true để luôn lấy vị trí mới
+      const result = await getGeolocationWeather(true);
       console.log('Location weather loaded:', result);
+      toast.success('Đã cập nhật vị trí hiện tại!');
     } catch (error) {
       console.error('Failed to get current location weather:', error);
+      toast.error(error?.message || 'Không thể lấy vị trí của bạn. Vui lòng thử lại.');
     }
   };
 
@@ -232,20 +250,30 @@ const Home = () => {
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
+          center={!currentWeather}
         >
           {currentWeather ? (
-            <WeatherDisplay 
-              weather={currentWeather}
-              forecast={forecast}
-            />
+            <>
+              <WeatherDisplay 
+                weather={currentWeather}
+                forecast={forecast}
+              />
+
+              {/* Hiển thị suggestions nếu có */}
+              {suggestions.length > 0 && (
+                <div style={{ marginTop: 16, width: '100%' }}>
+                  <SuggestionCard suggestion={suggestions[0]} />
+                </div>
+              )}
+            </>
           ) : (
             <div>
               <WelcomeMessage>
-                <h1>Welcome, {user?.username}!</h1>
-                <p>Get started by searching for a city or using your current location</p>
+                <h1>Xin chào, {user?.fullName}!</h1>
+                <p>Bắt đầu bằng cách tìm kiếm thành phố hoặc dùng vị trí hiện tại</p>
               </WelcomeMessage>
               <GetStartedButton onClick={() => setShowSearchModal(true)}>
-                Search for Weather
+                Tìm kiếm thời tiết
               </GetStartedButton>
             </div>
           )}
@@ -257,7 +285,6 @@ const Home = () => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          {/* stable container to avoid reflow; internal content swaps with AnimatePresence */}
           <motion.div layout style={{ minHeight: 560 }}>
             <AnimatePresence mode="wait">
               {showDiscordSettings ? (
@@ -284,12 +311,6 @@ const Home = () => {
                     isDetailsPanel
                   />
                   {currentWeather?.location?.lat && currentWeather?.location?.lon && (
-                    <WeatherTrendChart 
-                      lat={currentWeather.location.lat}
-                      lon={currentWeather.location.lon}
-                    />
-                  )}
-                  {currentWeather?.location?.lat && currentWeather?.location?.lon && (
                     <WeatherMap 
                       lat={currentWeather.location.lat}
                       lon={currentWeather.location.lon}
@@ -306,8 +327,8 @@ const Home = () => {
                   transition={{ duration: 0.25 }}
                 >
                   <div style={{ color: 'white', textAlign: 'center', padding: '40px 0' }}>
-                    <h3>Weather Details</h3>
-                    <p>Search for a city to see detailed weather information</p>
+                    <h3>Chi tiết thời tiết</h3>
+                    <p>Tìm kiếm thành phố để xem thông tin chi tiết</p>
                   </div>
                 </motion.div>
               )}

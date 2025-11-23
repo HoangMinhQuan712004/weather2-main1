@@ -15,9 +15,9 @@ const deduplicateRequest = async (key, requestFn) => {
     return pendingRequests.get(key);
   }
   
-  // Check if we made the same request recently (within 1 second)
+  // Check if we made the same request recently (within 500ms to prevent duplicate searches)
   const lastRequestTime = requestTimestamps.get(key);
-  if (lastRequestTime && Date.now() - lastRequestTime < 1000) {
+  if (lastRequestTime && Date.now() - lastRequestTime < 500) {
     console.log(`Request ${key} made too recently, skipping...`);
     return null;
   }
@@ -208,12 +208,13 @@ router.get('/historical', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid coordinates or timestamp provided' });
     }
 
-    const requestKey = `historical_${latitude}_${longitude}_${timestamp}`;
-    const historicalData = await deduplicateRequest(requestKey, () => 
-      getHistoricalData(latitude, longitude, timestamp)
-    );
-
-    res.json(historicalData);
+    // Historical data support has been disabled on the server because the
+    // upstream provider (One Call timemachine) required a different product
+    // and produced repeated 401 errors. Return a clear 501 response so
+    // clients know this endpoint is intentionally unavailable.
+    return res.status(501).json({
+      message: 'Historical weather endpoint is disabled on this server. Enable a provider or contact the administrator.'
+    });
   } catch (error) {
     console.error('Historical weather error:', error);
     res.status(500).json({ message: error.message || 'Failed to fetch historical weather' });

@@ -1,15 +1,17 @@
+const dotenv = require('dotenv');
+dotenv.config();
+const rateLimit = require('express-rate-limit');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const weatherRoutes = require('./routes/weather');
 const userRoutes = require('./routes/user');
 const discordRoutes = require('./routes/discord');
+const cccdRoutes = require('./routes/cccd');
 
 const app = express();
 
@@ -42,6 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/cccd', cccdRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/discord', discordRoutes);

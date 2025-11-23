@@ -19,12 +19,13 @@ import { useWeather } from '../contexts/WeatherContext';
 
 const WeatherContainer = styled.div`
   width: 100%;
-  color: white;
-  background: linear-gradient(145deg, #1a237e 0%, #0d47a1 100%);
+  color: var(--text-color);
+  background: var(--card-background);
   border-radius: 20px;
-  padding: 25px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 28px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-normal);
 `;
 
 const CurrentWeather = styled.div`
@@ -42,67 +43,72 @@ const MainInfo = styled.div`
 `;
 
 const Temperature = styled.div`
-  font-size: 6rem;
-  font-weight: bold;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-  
+  font-size: 5.5rem;
+  font-weight: 800;
+  color: var(--primary-accent);
+  margin-right: 10px;
+
   @media (max-width: 768px) {
     font-size: 4rem;
   }
 `;
 
 const Location = styled.div`
-  font-size: 2rem;
-  font-weight: 600;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--text-color);
   
   @media (max-width: 768px) {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
   }
 `;
 
 const DateTime = styled.div`
-  font-size: 1.1rem;
-  opacity: 0.9;
-  margin-bottom: 20px;
+  font-size: 1rem;
+  opacity: 0.85;
+  margin-bottom: 18px;
+  color: var(--text-color);
 `;
 
 const WeatherIcon = styled.div`
-  font-size: 4rem;
-  margin-bottom: 20px;
+  font-size: 3.5rem;
+  margin-bottom: 14px;
   display: flex;
   justify-content: center;
   align-items: center;
+  color: var(--primary-accent);
 `;
 
 const WeatherDescription = styled.div`
-  font-size: 1.2rem;
-  font-weight: 500;
+  font-size: 1.05rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
   opacity: 0.9;
+  color: var(--text-color);
 `;
 
 const FavoritesButton = styled.button`
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 15px;
-  color: white;
-  font-size: 1rem;
-  font-weight: 500;
+  padding: 10px 18px;
+  background: var(--transparent-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-color);
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  margin: 20px auto;
-  
+  transition: all var(--transition-fast);
+  margin: 18px auto 0 auto;
+
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
+    background: var(--hover-bg);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-sm);
   }
-  
+
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -111,13 +117,13 @@ const FavoritesButton = styled.button`
 `;
 
 const LoadingSpinner = styled.div`
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border-top-color: white;
+  border-top-color: var(--primary-accent);
   animation: spin 1s linear infinite;
-  
+
   @keyframes spin {
     to {
       transform: rotate(360deg);
@@ -126,28 +132,27 @@ const LoadingSpinner = styled.div`
 `;
 
 const WeatherDetails = styled.div`
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 15px;
-  padding: 25px;
-  margin-bottom: 30px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--transparent-bg);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-color);
 `;
 
 const DetailsHeader = styled.h3`
-  margin: 0 0 20px 0;
-  font-size: 1.8rem;
-  font-weight: 600;
-  color: #ffffff;
-  padding-bottom: 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  margin: 0 0 18px 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-color);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
 `;
 
 const DetailsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
 `;
 
 const DetailItem = styled.div`

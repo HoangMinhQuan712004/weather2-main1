@@ -203,16 +203,11 @@ const CCCDRegister = () => {
         throw new Error(data.error || 'Đã xảy ra lỗi khi xử lý ảnh');
       }
 
-      // Cập nhật thông tin từ CCCD
-      setFormData(prev => ({
-        ...prev,
-        name: data.user.name || '',
-        cccd: data.user.cccd || '',
-        // Cập nhật các trường khác nếu cần
-      }));
-
-      setStep(2); // Chuyển sang bước tiếp theo
-      toast.success('Đã trích xuất thông tin từ CCCD thành công');
+      // Received extracted data from server. Navigate to Register page
+      // and pass extracted info as prefill state for the registration form.
+      const extracted = data.extracted || {};
+      const exists = data.exists || false;
+      navigate('/register', { state: { prefill: extracted, exists } });
     } catch (error) {
       console.error('Lỗi khi trích xuất thông tin:', error);
       toast.error(error.message || 'Có lỗi xảy ra khi xử lý ảnh CCCD');

@@ -4,12 +4,12 @@ import { useAuth } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Settings from './pages/Settings'; // Import Settings component
+import Settings from './pages/Settings';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { initializeConnectionTest } from './utils/connectionTest';
+import CCCDRegister from './components/auth/CCCDRegister';
 
-// PrivateRoute component to protect authenticated routes
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -23,7 +23,6 @@ const PrivateRoute = ({ children }) => {
 function App() {
   const { isAuthenticated, loading } = useAuth();
 
-  // Initialize connection test on app start
   useEffect(() => {
     initializeConnectionTest();
   }, []);
@@ -43,6 +42,10 @@ function App() {
           <Route 
             path="/register" 
             element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} 
+          />
+          <Route 
+            path="/register/cccd" 
+            element={!isAuthenticated ? <CCCDRegister /> : <Navigate to="/" replace />} 
           />
           <Route 
             path="/" 

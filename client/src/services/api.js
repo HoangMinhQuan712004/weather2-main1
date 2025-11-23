@@ -62,7 +62,12 @@ api.interceptors.response.use(
       status: 500, 
       message: error.message 
     };
-    return Promise.reject(normalized);
+
+    // Wrap normalized response into an Error object so callers can rely on
+    // the usual Error shape while still having access to response details.
+    const err = new Error(normalized.data?.message || normalized.message || 'API Error');
+    err.response = normalized;
+    return Promise.reject(err);
   }
 );
 
