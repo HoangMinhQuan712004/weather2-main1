@@ -21,6 +21,19 @@ const auth = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
+    // Helpful debug info: indicate whether an Authorization header was present
+    try {
+      const rawAuth = req.header('Authorization');
+      if (rawAuth) {
+        // don't log full token; show masked prefix for debugging
+        const token = rawAuth.replace('Bearer ', '');
+        console.warn('Authorization header present. token prefix:', token.slice(0, 12) + '...');
+      } else {
+        console.warn('No Authorization header present on request');
+      }
+    } catch (e) {
+      // ignore logging errors
+    }
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token' });
     } else if (error.name === 'TokenExpiredError') {

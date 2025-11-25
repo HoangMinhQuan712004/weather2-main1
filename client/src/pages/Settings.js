@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { motion } from 'framer-motion';
 import { FiToggleLeft, FiToggleRight, FiSave } from 'react-icons/fi';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 
 const SettingsContainer = styled.div`
   padding: 100px 20px 40px 20px;
@@ -253,6 +254,12 @@ const Settings = () => {
     setTimeout(() => setSaveMessage(''), 2000);
   };
 
+  const navigate = useNavigate();
+
+  const openWAFDemo = () => {
+    navigate('/waf-demo');
+  };
+
   return (
     <SettingsContainer>
       <motion.div
@@ -353,6 +360,24 @@ const Settings = () => {
         <SaveButton onClick={handleSave}>
           <FiSave /> Save All Settings
         </SaveButton>
+
+        <h2>🛡️ Security & Testing</h2>
+        <SettingGroup>
+          <SettingItem
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+          >
+            <div style={{ width: '100%' }}>
+              <SettingLabel>WAF / ModSecurity Demo Page</SettingLabel>
+              <SettingDescription>
+                Open a local demo page that lists common payloads for testing WAF behavior. Only use on local/dev environments.
+              </SettingDescription>
+            </div>
+            <SaveButton onClick={openWAFDemo} style={{ padding: '10px 18px' }}>
+              Open Demo
+            </SaveButton>
+          </SettingItem>
+        </SettingGroup>
 
         {saveMessage && (
           <motion.div

@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Settings from './pages/Settings';
+import WAFDemo from './pages/WAFDemo';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { initializeConnectionTest } from './utils/connectionTest';
@@ -54,6 +55,10 @@ function App() {
           <Route 
             path="/settings" 
             element={<PrivateRoute><Settings /></PrivateRoute>} 
+          />
+          <Route
+            path="/waf-demo"
+            element={<PrivateRoute><WAFDemo /></PrivateRoute>}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
