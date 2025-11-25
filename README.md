@@ -1,5 +1,5 @@
 # Demo: Nginx + ModSecurity (WAF) blocking SQL Injection and XSS
-Link demo youtube: https://youtu.be/RlR8G6uZoi8
+Link demo youtube: https://youtu.be/-05fVLBF-wc
 
 This demo runs a vulnerable Flask app behind Nginx with ModSecurity and a tiny set of demo rules that block simple SQL Injection and reflected XSS attempts.
 Files added:
