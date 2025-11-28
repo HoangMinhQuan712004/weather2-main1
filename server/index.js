@@ -6,18 +6,23 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-
+const wafLogger = require('./middleware/wafLogger');
+const securityRoutes = require('./routes/security');
 const authRoutes = require('./routes/auth');
 const weatherRoutes = require('./routes/weather');
 const userRoutes = require('./routes/user');
 const discordRoutes = require('./routes/discord');
 const cccdRoutes = require('./routes/cccd');
+const attackMonitor = require('./middleware/attackMonitor');
 
 const app = express();
 
 app.set('trust proxy', 1);
 
 // Security and performance middleware
+app.use(attackMonitor);
+app.use(wafLogger);
+app.use('/api/security', securityRoutes);
 app.use(helmet());
 app.use(compression());
 app.use(cors({

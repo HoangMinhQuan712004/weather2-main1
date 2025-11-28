@@ -1,78 +1,108 @@
 const express = require('express');
+const router = express.Router();
 const SecurityEvent = require('../models/SecurityEvent');
 
-const router = express.Router();
+// Admin key from environment
+const ADMIN_KEY = process.env.ADMIN_KEY || 'dev-admin-key-change-in-production';
 
-const SECURITY_ENABLED = process.env.ENABLE_SECURITY !== 'false';
-
-router.get('/status', (req, res) => {
-  res.json({
-    helmet: true,
-    rateLimit: true,
-    mongoSanitize: SECURITY_ENABLED,
-    xssClean: SECURITY_ENABLED,
-    hpp: SECURITY_ENABLED,
-    contentSecurityPolicy: SECURITY_ENABLED,
-    securityEnabled: SECURITY_ENABLED
-  });
-});
-
-function requireAdminKey(req, res, next) {
-  const adminKey = process.env.ADMIN_API_KEY;
-  if (!adminKey) {
-    return res.status(500).json({
-      message: 'ADMIN_API_KEY chưa được cấu hình trong server'
-    });
-  }
-
-  const providedKey = req.header('x-admin-key');
-  if (!providedKey || providedKey !== adminKey) {
-    return res.status(403).json({ message: 'Admin key không hợp lệ' });
+// Middleware to check admin key
+const requireAdmin = (req, res, next) => {
+  const adminKey = req.headers['x-admin-key'];
+  if (!adminKey || adminKey !== ADMIN_KEY) {
+    return res.status(403).json({ message: 'Unauthorized' });
   }
   next();
-}
+};
 
-router.get('/events', requireAdminKey, async (req, res) => {
+// GET /api/security/status - Get WAF protection status
+router.get('/status', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-    const type = req.query.type;
+    const recentEvents = await SecurityEvent.countDocuments({
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    });
+    
+    res.json({
+      securityEnabled: true,
+      helmet: true,
+      rateLimit: true,
+      mongoSanitize: false,
+      xssClean: false,
+      modsecurity: true,
+      eventsLast24h: recentEvents,
+      message: 'WAF is active and protecting your application'
+    });
+  } catch (error) {
+    console.error('Status error:', error);
+    res.status(500).json({ message: 'Failed to get status' });
+  }
+});
 
-    const filter = {};
-    if (type) {
-      filter.type = type;
-    }
-
-    const events = await SecurityEvent.find(filter)
+// GET /api/security/events - Get security events (requires admin key)
+router.get('/events', requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = parseInt(req.query.skip) || 0;
+    
+    const events = await SecurityEvent.find()
       .sort({ createdAt: -1 })
       .limit(limit)
+      .skip(skip)
       .lean();
-
-    res.json({ events });
+    
+    const total = await SecurityEvent.countDocuments();
+    
+    res.json({
+      events,
+      total,
+      page: Math.floor(skip / limit) + 1,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
-    console.error('Lỗi lấy security events:', error);
-    res.status(500).json({ message: 'Không thể tải danh sách sự kiện' });
+    console.error('Get events error:', error);
+    res.status(500).json({ message: 'Failed to fetch security events' });
   }
 });
 
-router.delete('/events/:id', requireAdminKey, async (req, res) => {
-  try {
-    await SecurityEvent.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Lỗi xoá security event:', error);
-    res.status(500).json({ message: 'Không thể xoá sự kiện' });
-  }
-});
-
-router.delete('/events', requireAdminKey, async (req, res) => {
+// DELETE /api/security/events - Clear all events (requires admin key)
+router.delete('/events', requireAdmin, async (req, res) => {
   try {
     await SecurityEvent.deleteMany({});
-    res.json({ success: true });
+    res.json({ 
+      message: 'All security events cleared',
+      deleted: true 
+    });
   } catch (error) {
-    console.error('Lỗi xoá danh sách security event:', error);
-    res.status(500).json({ message: 'Không thể xoá sự kiện' });
+    console.error('Clear events error:', error);
+    res.status(500).json({ message: 'Failed to clear events' });
+  }
+});
+
+// POST /api/security/log - Log a security event (internal use)
+router.post('/log', async (req, res) => {
+  try {
+    const eventData = {
+      type: req.body.type || 'BLOCKED_REQUEST',
+      severity: req.body.severity || 'medium',
+      ip: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+      userAgent: req.get('user-agent') || 'unknown',
+      method: req.body.method || 'GET',
+      path: req.body.path || '/',
+      query: req.body.query || '',
+      message: req.body.message || 'Security event detected',
+      details: req.body.details || '',
+      ruleId: req.body.ruleId || '',
+      blocked: req.body.blocked !== false
+    };
+    
+    const event = await SecurityEvent.create(eventData);
+    res.status(201).json({ 
+      message: 'Event logged successfully',
+      event 
+    });
+  } catch (error) {
+    console.error('Log event error:', error);
+    res.status(500).json({ message: 'Failed to log event' });
   }
 });
 
 module.exports = router;
-

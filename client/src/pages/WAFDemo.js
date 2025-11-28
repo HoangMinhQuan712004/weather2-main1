@@ -7,18 +7,17 @@ import {
   XCircle,
   RefreshCw,
   Trash2,
-  Copy,
-  ExternalLink,
   Terminal,
-  Activity
+  Activity,
+  Zap
 } from 'lucide-react';
 
 const WAFDemo = () => {
-  const [mode, setMode] = useState('GET');
   const [openCategories, setOpenCategories] = useState(new Set(['sql']));
   const [securityEvents, setSecurityEvents] = useState([]);
   const [wafStatus, setWafStatus] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     fetchWAFStatus();
@@ -38,8 +37,8 @@ const WAFDemo = () => {
   const fetchSecurityEvents = async () => {
     setLoading(true);
     try {
-      const adminKey = localStorage.getItem('adminKey') || 'your-admin-key';
-      const response = await fetch('/api/security/events?limit=20', {
+      const adminKey = localStorage.getItem('adminKey') || 'dev-admin-key-change-in-production';
+      const response = await fetch('/api/security/events?limit=50', {
         headers: {
           'x-admin-key': adminKey
         }
@@ -58,7 +57,7 @@ const WAFDemo = () => {
 
   const clearEvents = async () => {
     try {
-      const adminKey = localStorage.getItem('adminKey') || 'your-admin-key';
+      const adminKey = localStorage.getItem('adminKey') || 'dev-admin-key-change-in-production';
       const response = await fetch('/api/security/events', {
         method: 'DELETE',
         headers: {
@@ -86,41 +85,29 @@ const WAFDemo = () => {
     });
   };
 
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('Copied to clipboard!');
-    } catch (err) {
-      console.error('Copy failed', err);
-    }
-  };
+  const WAF_BASE_URL = 'http://localhost'; // đi qua Docker WAF
 
-  const makeCurl = (example) => {
-    const target = window.location.origin;
-    try {
-      const url = new URL(example);
-      const path = url.pathname + url.search;
-      
-      if (mode === 'GET') {
-        return `curl -i "${target}${path}"`;
-      }
-      if (mode === 'POST') {
-        const params = new URLSearchParams(url.search);
-        let body = '';
-        if ([...params].length > 0) {
-          const [k] = [...params][0];
-          body = `${k}=${encodeURIComponent(params.get(k))}`;
-        } else {
-          body = `data=${encodeURIComponent(url.pathname + url.search)}`;
-        }
-        return `curl -i -X POST "${target}${url.pathname}" -H "Content-Type: application/x-www-form-urlencoded" -d "${body}"`;
-      }
-      return `curl -i "${target}${url.pathname}${url.search}" -H "User-Agent: ${example.replace(/"/g, '\\"')}"`;
-    } catch (e) {
-      return `curl -i "${example}"`;
-    }
-  };
+const testPayload = async (url, description) => {
+  setTesting(true);
+  try {
+    const response = await fetch(WAF_BASE_URL + url);  // bỏ method/headers
 
+    setTimeout(() => {
+      fetchSecurityEvents();
+    }, 1000);
+
+    if (response.status === 403 || response.status === 406) {
+      alert(`✅ Attack blocked successfully!\n${description}`);
+    } else {
+      alert(`⚠️ Request went through (status: ${response.status})\nCheck if WAF is running properly.`);
+    }
+  } catch (error) {
+    console.error('Test error:', error);
+    alert('❌ Test failed: ' + error.message);
+  } finally {
+    setTesting(false);
+  }
+};
   const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleString('vi-VN', {
       day: '2-digit',
@@ -132,19 +119,30 @@ const WAFDemo = () => {
     });
   };
 
+  // Real attack payloads targeting YOUR actual APIs
   const categories = [
     {
       id: 'sql',
-      title: 'SQL Injection',
+      title: 'SQL Injection Attacks',
       icon: '💉',
       severity: 'high',
       examples: [
-        "http://localhost/?id=1' OR '1'='1",
-        "http://localhost/?id=1' OR 1=1--",
-        "http://localhost/?user=admin'--",
-        "http://localhost/?name=' OR 'a'='a",
-        "http://localhost/search?q=1' UNION SELECT NULL--",
-        "http://localhost/product?id=1'; DROP TABLE users--",
+        {
+          url: "/api/weather/search?q=Hanoi' OR '1'='1",
+          description: "SQL Injection into weather search - attempts to bypass query filters"
+        },
+        {
+          url: "/api/weather/search?q=1' UNION SELECT NULL--",
+          description: "UNION-based SQL injection to extract database data"
+        },
+        {
+          url: "/api/weather/current?lat=21.0285&lon=105.8542' OR 1=1--",
+          description: "SQL injection in coordinate parameters"
+        },
+        {
+          url: "/api/user/favorites/abc' OR '1'='1",
+          description: "SQL injection in favorite city deletion"
+        }
       ]
     },
     {
@@ -153,10 +151,18 @@ const WAFDemo = () => {
       icon: '🔴',
       severity: 'high',
       examples: [
-        "http://localhost/?search=<script>alert(1)</script>",
-        "http://localhost/?name=<script>alert('XSS')</script>",
-        "http://localhost/?q=<script>alert(document.cookie)</script>",
-        "http://localhost/?input=<img src=x onerror=alert(1)>",
+        {
+          url: "/api/weather/search?q=<script>alert('XSS')</script>",
+          description: "Reflected XSS via city search"
+        },
+        {
+          url: "/api/weather/search?q=<img src=x onerror=alert(1)>",
+          description: "Image-based XSS injection"
+        },
+        {
+          url: "/api/user/search-history?city=<script>document.cookie</script>",
+          description: "XSS targeting search history"
+        }
       ]
     },
     {
@@ -165,51 +171,70 @@ const WAFDemo = () => {
       icon: '📁',
       severity: 'high',
       examples: [
-        'http://localhost/download?file=../../../etc/passwd',
-        'http://localhost/view?path=../../../etc/shadow',
-        'http://localhost/read?file=../../../../etc/hosts',
+        {
+          url: "/api/weather/../../../etc/passwd",
+          description: "Directory traversal to access system files"
+        },
+        {
+          url: "/api/user/../../config/database.json",
+          description: "Attempts to read database configuration"
+        },
+        {
+          url: "/api/auth/../../../../etc/shadow",
+          description: "Tries to access password hashes"
+        }
       ]
     },
     {
       id: 'command',
       title: 'Command Injection',
       icon: '💻',
+      severity: 'critical',
+      examples: [
+        {
+          url: "/api/weather/search?q=Hanoi; ls -la",
+          description: "Command injection via search query"
+        },
+        {
+          url: "/api/weather/search?q=`whoami`",
+          description: "Backtick command execution attempt"
+        },
+        {
+          url: "/api/user/favorites?name=test$(cat /etc/passwd)",
+          description: "Command substitution attack"
+        }
+      ]
+    },
+    {
+      id: 'auth',
+      title: 'Authentication Bypass',
+      icon: '🔓',
+      severity: 'critical',
+      examples: [
+        {
+          url: "/api/auth/login?email=admin'--&password=anything",
+          description: "SQL injection for auth bypass"
+        },
+        {
+          url: "/api/auth/me?userId=1' OR '1'='1",
+          description: "Attempts to access any user profile"
+        }
+      ]
+    },
+    {
+      id: 'nosql',
+      title: 'NoSQL Injection',
+      icon: '🗄️',
       severity: 'high',
       examples: [
-        'http://localhost/ping?host=127.0.0.1; ls -la',
-        'http://localhost/ping?host=127.0.0.1 && cat /etc/passwd',
-        'http://localhost/exec?cmd=whoami',
-      ]
-    },
-    {
-      id: 'lfi',
-      title: 'Local File Inclusion',
-      icon: '📄',
-      severity: 'medium',
-      examples: [
-        'http://localhost/?page=../../../../etc/passwd',
-        'http://localhost/include?file=/etc/shadow',
-        'http://localhost/view?doc=/proc/self/environ',
-      ]
-    },
-    {
-      id: 'ssrf',
-      title: 'Server-Side Request Forgery',
-      icon: '🌐',
-      severity: 'medium',
-      examples: [
-        'http://localhost/fetch?url=http://127.0.0.1',
-        'http://localhost/get?url=http://169.254.169.254/latest/meta-data/',
-      ]
-    },
-    {
-      id: 'redirect',
-      title: 'Open Redirect',
-      icon: '↗️',
-      severity: 'low',
-      examples: [
-        'http://localhost/redirect?url=http://evil.com',
-        'http://localhost/goto?next=//evil.com',
+        {
+          url: "/api/user/favorites?cityId[$ne]=null",
+          description: "MongoDB operator injection"
+        },
+        {
+          url: "/api/auth/login?email[$regex]=.*&password[$ne]=null",
+          description: "MongoDB regex injection for auth bypass"
+        }
       ]
     },
     {
@@ -218,8 +243,30 @@ const WAFDemo = () => {
       icon: '📋',
       severity: 'medium',
       examples: [
-        'http://localhost/page?url=%0d%0aSet-Cookie:%20admin=true',
-        'http://localhost/redirect?to=%0d%0aLocation:%20http://evil.com',
+        {
+          url: "/api/weather/current?lat=21.0285&lon=105.8542%0d%0aSet-Cookie:%20admin=true",
+          description: "CRLF injection to set malicious cookies"
+        },
+        {
+          url: "/api/user/preferences?lang=%0d%0aLocation:%20http://evil.com",
+          description: "Header injection for redirect"
+        }
+      ]
+    },
+    {
+      id: 'api',
+      title: 'API Abuse',
+      icon: '⚡',
+      severity: 'medium',
+      examples: [
+        {
+          url: "/api/weather/search?q=" + "A".repeat(10000),
+          description: "Buffer overflow attempt with large payload"
+        },
+        {
+          url: "/api/user/favorites?lat=9999999&lon=9999999",
+          description: "Invalid coordinate parameters"
+        }
       ]
     }
   ];
@@ -235,15 +282,14 @@ const WAFDemo = () => {
           <Shield size={32} /> WAF Security Testing Dashboard
         </motion.h1>
         <p className="subtitle">
-          Interactive security testing interface for ModSecurity WAF
+          Real attack testing against your Weather App APIs
         </p>
         <div className="warning">
           <AlertTriangle size={20} />
-          <span>Development/Testing Environment Only - Do Not Use in Production</span>
+          <span>⚠️ This tests REAL attacks on YOUR APIs - Use only in development!</span>
         </div>
       </div>
 
-      {/* WAF Status Overview */}
       {wafStatus && (
         <motion.div
           className="card"
@@ -255,30 +301,25 @@ const WAFDemo = () => {
           <div className="status-badges">
             <div className={`status-badge ${wafStatus.helmet ? 'enabled' : 'disabled'}`}>
               {wafStatus.helmet ? <CheckCircle size={16} /> : <XCircle size={16} />}
-              Helmet Security Headers
+              Helmet Security
             </div>
             <div className={`status-badge ${wafStatus.rateLimit ? 'enabled' : 'disabled'}`}>
               {wafStatus.rateLimit ? <CheckCircle size={16} /> : <XCircle size={16} />}
               Rate Limiting
             </div>
-            <div className={`status-badge ${wafStatus.mongoSanitize ? 'enabled' : 'disabled'}`}>
-              {wafStatus.mongoSanitize ? <CheckCircle size={16} /> : <XCircle size={16} />}
-              MongoDB Sanitization
+            <div className={`status-badge ${wafStatus.modsecurity ? 'enabled' : 'disabled'}`}>
+              {wafStatus.modsecurity ? <CheckCircle size={16} /> : <XCircle size={16} />}
+              ModSecurity WAF
             </div>
-            <div className={`status-badge ${wafStatus.xssClean ? 'enabled' : 'disabled'}`}>
-              {wafStatus.xssClean ? <CheckCircle size={16} /> : <XCircle size={16} />}
-              XSS Protection
-            </div>
-            <div className={`status-badge ${wafStatus.securityEnabled ? 'enabled' : 'disabled'}`}>
-              {wafStatus.securityEnabled ? <CheckCircle size={16} /> : <XCircle size={16} />}
-              Security Enabled
+            <div className={`status-badge enabled`}>
+              <CheckCircle size={16} />
+              {wafStatus.eventsLast24h || 0} events (24h)
             </div>
           </div>
         </motion.div>
       )}
 
       <div className="grid">
-        {/* Attack Payloads */}
         <motion.div
           className="card"
           initial={{ opacity: 0, x: -20 }}
@@ -287,25 +328,9 @@ const WAFDemo = () => {
         >
           <h2><Terminal size={24} /> Attack Payloads</h2>
           
-          <div className="mode-selector">
-            <button 
-              className={`mode-button ${mode === 'GET' ? 'active' : ''}`}
-              onClick={() => setMode('GET')}
-            >
-              GET Request
-            </button>
-            <button 
-              className={`mode-button ${mode === 'POST' ? 'active' : ''}`}
-              onClick={() => setMode('POST')}
-            >
-              POST Request
-            </button>
-            <button 
-              className={`mode-button ${mode === 'HEADER' ? 'active' : ''}`}
-              onClick={() => setMode('HEADER')}
-            >
-              Header Injection
-            </button>
+          <div className="info-box">
+            <p>Click <strong>"Test Attack"</strong> to send real malicious requests to your APIs.</p>
+            <p>ModSecurity should block them and log the events. ✅</p>
           </div>
 
           <div className="payloads-container">
@@ -329,27 +354,18 @@ const WAFDemo = () => {
                     >
                       {category.examples.map((example, idx) => (
                         <div key={idx} className="payload-item">
-                          <pre className="payload-code">{example}</pre>
-                          <div className="button-group">
-                            <button 
-                              className="action-button"
-                              onClick={() => copyToClipboard(example)}
-                            >
-                              <Copy size={14} /> Copy URL
-                            </button>
-                            <button 
-                              className="action-button"
-                              onClick={() => window.open(example, '_blank')}
-                            >
-                              <ExternalLink size={14} /> Test
-                            </button>
-                            <button 
-                              className="action-button"
-                              onClick={() => copyToClipboard(makeCurl(example))}
-                            >
-                              <Terminal size={14} /> Copy cURL
-                            </button>
+                          <div className="payload-description">
+                            {example.description}
                           </div>
+                          <pre className="payload-code">{example.url}</pre>
+                          <button 
+                            className="test-button"
+                            onClick={() => testPayload(example.url, example.description)}
+                            disabled={testing}
+                          >
+                            <Zap size={14} />
+                            {testing ? 'Testing...' : 'Test Attack'}
+                          </button>
                         </div>
                       ))}
                     </motion.div>
@@ -360,7 +376,6 @@ const WAFDemo = () => {
           </div>
         </motion.div>
 
-        {/* Security Events Monitor */}
         <motion.div
           className="card"
           initial={{ opacity: 0, x: 20 }}
@@ -390,7 +405,7 @@ const WAFDemo = () => {
                 <CheckCircle size={48} />
                 <p>No security events detected</p>
                 <p className="empty-subtitle">
-                  Try testing some payloads to see events here
+                  Click "Test Attack" on the left to see blocking in action!
                 </p>
               </div>
             ) : (
@@ -413,7 +428,9 @@ const WAFDemo = () => {
                       </div>
                     </div>
                     <div className="event-details">
-                      {event.message || event.details || 'No details available'}
+                      <strong>{event.message}</strong>
+                      <div className="event-path">{event.method} {event.path}</div>
+                      {event.query && <div className="event-query">Query: {event.query.substring(0, 100)}</div>}
                     </div>
                     {event.ip && (
                       <div className="event-ip">IP: {event.ip}</div>
@@ -475,6 +492,20 @@ const WAFDemo = () => {
           font-weight: 500;
         }
 
+        .info-box {
+          background: rgba(33, 150, 243, 0.1);
+          border: 1px solid rgba(33, 150, 243, 0.3);
+          padding: 15px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+          color: #2196f3;
+        }
+
+        .info-box p {
+          margin: 5px 0;
+          font-size: 0.95rem;
+        }
+
         .card {
           background: rgba(255, 255, 255, 0.9);
           border: 1px solid rgba(0, 0, 0, 0.1);
@@ -488,11 +519,6 @@ const WAFDemo = () => {
         [data-theme='dark'] .card {
           background: rgba(40, 44, 54, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .card:hover {
-          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-          border-color: #667eea;
         }
 
         .card h2 {
@@ -548,40 +574,6 @@ const WAFDemo = () => {
           }
         }
 
-        .mode-selector {
-          display: flex;
-          gap: 10px;
-          margin-bottom: 25px;
-          flex-wrap: wrap;
-        }
-
-        .mode-button {
-          padding: 10px 20px;
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          border-radius: 8px;
-          background: transparent;
-          color: #333;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        [data-theme='dark'] .mode-button {
-          color: #f0f2f5;
-          border-color: rgba(255, 255, 255, 0.1);
-        }
-
-        .mode-button.active {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          border-color: transparent;
-        }
-
-        .mode-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-
         .payloads-container {
           max-height: 600px;
           overflow-y: auto;
@@ -600,14 +592,6 @@ const WAFDemo = () => {
         [data-theme='dark'] .category-card {
           background: rgba(255, 255, 255, 0.05);
           border-color: rgba(255, 255, 255, 0.1);
-        }
-
-        .category-card:hover {
-          background: rgba(255, 255, 255, 0.7);
-        }
-
-        [data-theme='dark'] .category-card:hover {
-          background: rgba(255, 255, 255, 0.08);
         }
 
         .category-header {
@@ -640,7 +624,7 @@ const WAFDemo = () => {
           display: flex;
           flex-direction: column;
           gap: 10px;
-          padding: 12px;
+          padding: 15px;
           background: rgba(0, 0, 0, 0.03);
           border-radius: 8px;
           margin-top: 10px;
@@ -652,13 +636,23 @@ const WAFDemo = () => {
           border-color: rgba(255, 255, 255, 0.1);
         }
 
+        .payload-description {
+          font-size: 0.9rem;
+          color: #666;
+          font-style: italic;
+        }
+
+        [data-theme='dark'] .payload-description {
+          color: #aaa;
+        }
+
         .payload-code {
           margin: 0;
           padding: 12px;
           background: rgba(0, 0, 0, 0.05);
           border: 1px solid rgba(0, 0, 0, 0.1);
           border-radius: 6px;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
           overflow-x: auto;
           white-space: pre-wrap;
           word-break: break-all;
@@ -669,10 +663,30 @@ const WAFDemo = () => {
           border-color: rgba(255, 255, 255, 0.1);
         }
 
-        .button-group {
+        .test-button {
           display: flex;
+          align-items: center;
+          justify-content: center;
           gap: 8px;
-          flex-wrap: wrap;
+          padding: 10px 20px;
+          background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+          border: none;
+          border-radius: 6px;
+          color: white;
+          font-size: 0.9rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .test-button:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        }
+
+        .test-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .action-button {
@@ -698,7 +712,6 @@ const WAFDemo = () => {
         .action-button:hover {
           background: #667eea;
           color: white;
-          transform: translateY(-1px);
         }
 
         .refresh-button {
@@ -718,11 +731,6 @@ const WAFDemo = () => {
 
         .refresh-button:hover {
           background: #764ba2;
-        }
-
-        .refresh-button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
         }
 
         .events-header {
@@ -755,21 +763,6 @@ const WAFDemo = () => {
           opacity: 0.6;
         }
 
-        .empty-state svg {
-          margin-bottom: 15px;
-          opacity: 0.5;
-        }
-
-        .empty-state p {
-          font-size: 1rem;
-          margin: 5px 0;
-        }
-
-        .empty-subtitle {
-          font-size: 0.9rem;
-          opacity: 0.7;
-        }
-
         .security-event {
           background: rgba(255, 255, 255, 0.5);
           border: 1px solid rgba(0, 0, 0, 0.1);
@@ -783,7 +776,8 @@ const WAFDemo = () => {
           border-color: rgba(255, 255, 255, 0.1);
         }
 
-        .security-event.severity-high {
+        .security-event.severity-high,
+        .security-event.severity-critical {
           border-left: 4px solid #f44336;
         }
 
@@ -805,18 +799,7 @@ const WAFDemo = () => {
         .event-type {
           font-weight: 600;
           font-size: 1rem;
-        }
-
-        .severity-high .event-type {
           color: #f44336;
-        }
-
-        .severity-medium .event-type {
-          color: #ff9800;
-        }
-
-        .severity-low .event-type {
-          color: #4caf50;
         }
 
         .event-time {
@@ -826,8 +809,23 @@ const WAFDemo = () => {
 
         .event-details {
           font-size: 0.9rem;
-          opacity: 0.8;
           margin-top: 8px;
+        }
+
+        .event-path {
+          font-family: monospace;
+          background: rgba(0, 0, 0, 0.05);
+          padding: 4px 8px;
+          border-radius: 4px;
+          margin-top: 5px;
+          font-size: 0.85rem;
+        }
+
+        .event-query {
+          font-family: monospace;
+          font-size: 0.8rem;
+          opacity: 0.7;
+          margin-top: 5px;
         }
 
         .event-ip {
@@ -847,32 +845,6 @@ const WAFDemo = () => {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 768px) {
-          .waf-container {
-            padding: 80px 15px 40px;
-          }
-
-          .waf-header h1 {
-            font-size: 2rem;
-            flex-direction: column;
-          }
-
-          .events-header {
-            flex-direction: column;
-            gap: 15px;
-            align-items: flex-start;
-          }
-
-          .header-buttons {
-            width: 100%;
-          }
-
-          .refresh-button,
-          .action-button {
-            flex: 1;
-          }
         }
       `}</style>
     </div>

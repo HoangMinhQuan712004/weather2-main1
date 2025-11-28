@@ -44,7 +44,7 @@ const INSPECTED_HEADERS = ['user-agent', 'referer'];
 const SKIPPED_PATHS = [
   '/api/security/status',
   '/api/security/events',
-  '/api/weather/search'   // cho phép search đi qua, không áp dụng attackMonitor
+  // XÓA '/api/weather/search' nếu bạn muốn chặn SQL Injection ở search
 ];
 const AUTH_SAFE_PATHS = ['/api/auth/login', '/api/auth/register', '/api/auth/login/cccd'];
 
